@@ -1,0 +1,78 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap");
+
+:root {
+  --cor-primaria: #2e7d32;
+  --cor-sucesso: #4caf50;
+  --cor-perigo: #d32f2f;
+  --cor-fundo: #f4f7f6;
+  --cor-texto: #333;
+  --sombra-card: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+body {
+  font-family: "Poppins", sans-serif;
+  background-color: var(--cor-fundo);
+  color: var(--cor-texto);
+}
+
+.navbar {
+  background-color: var(--cor-primaria) !important;
+}
+
+.card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: var(--sombra-card);
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.card-title {
+  font-weight: 600;
+  color: #555;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.card-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--cor-primaria);
+}
+
+.btn-success {
+  background-color: var(--cor-sucesso);
+  border-color: var(--cor-sucesso);
+}
+
+.btn-danger {
+  background-color: var(--cor-perigo);
+  border-color: var(--cor-perigo);
+}
+
+.btn {
+  transition: transform 0.2s ease;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.btn:hover {
+  transform: scale(1.03);
+}
+
+.status-ligada {
+  background-color: var(--cor-sucesso) !important;
+  color: white;
+}
+
+.status-desligada {
+  background-color: var(--cor-perigo) !important;
+  color: white;
+}
