@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusBombaEl = document.getElementById("statusBomba");
   const cardStatusBombaEl = document.getElementById("cardStatusBomba");
   const tabelaEventosEl = document.getElementById("tabelaEventos");
+  const valorETEl = document.getElementById("valorET");
   const ctx = document.getElementById("graficoHistorico").getContext("2d");
   let graficoHistorico; // Variável para a instância do gráfico
 
@@ -92,6 +93,14 @@ document.addEventListener("DOMContentLoaded", () => {
         ).toFixed(1)} °C`;
       } else {
         valorTemperaturaArEl.textContent = "-- °C";
+      }
+      // --- NOVA PARTE: Atualiza o card de ET ---
+      if (dados.evapotranspiracao && dados.evapotranspiracao.valor) {
+        valorETEl.textContent = `${parseFloat(
+          dados.evapotranspiracao.valor
+        ).toFixed(2)}`;
+      } else {
+        valorETEl.textContent = "--";
       }
 
       // Verifica e atualiza a Umidade do Ar
