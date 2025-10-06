@@ -5,9 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
     window.location.href = "login.html";
     return;
   }
-
   const API_URL = "http://localhost:3000";
-
   let sistemaIdAtivo = null;
   let listaDeSistemas = [];
 
@@ -28,7 +26,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnEditarSistema = document.getElementById("btnEditarSistema");
   const btnExcluirSistema = document.getElementById("btnExcluirSistema");
   const logoutButton = document.getElementById("logoutButton");
-
   const valorUmidadeSoloEl = document.getElementById("valorUmidadeSolo");
   const valorTemperaturaArEl = document.getElementById("valorTemperaturaAr");
   const valorUmidadeArEl = document.getElementById("valorUmidadeAr");
@@ -38,7 +35,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const tabelaEventosEl = document.getElementById("tabelaEventos");
   const ctx = document.getElementById("graficoHistorico").getContext("2d");
   let graficoHistorico;
-
   const modalAdicionarSistemaEl = document.getElementById(
     "modalAdicionarSistema"
   );
@@ -64,26 +60,54 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function postData(endpoint, body, method = "POST") {
-    const response = await fetch(`${API_URL}${endpoint}`, {
-      method: method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) {
-      if (response.status === 401 || response.status === 403) logout();
-      const errorData = await response.json();
-      throw new Error(
-        errorData.message || `Falha na requisição: ${response.statusText}`
-      );
+    try {
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        method: method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) logout();
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message || `Falha na requisição: ${response.statusText}`
+        );
+      }
+      return response.json();
+    } catch (error) {
+      console.error(`Erro em ${method} para ${endpoint}:`, error);
+      throw error;
     }
-    return response.json();
   }
 
-  // --- 4. FUNÇÕES PRINCIPAIS DO DASHBOARD ---
+  async function putData(endpoint, body) {
+    return postData(endpoint, body, "PUT");
+  }
 
+  async function deleteData(endpoint) {
+    try {
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) logout();
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message || `Falha na requisição: ${response.statusText}`
+        );
+      }
+      return response.json();
+    } catch (error) {
+      console.error(`Erro em deleteData para ${endpoint}:`, error);
+      throw error;
+    }
+  }
+
+  // --- 4. LÓGICA PRINCIPAL DO DASHBOARD ---
   async function inicializarDashboard() {
     try {
       listaDeSistemas = (await fetchData("/api/sistemas")) || [];
@@ -91,12 +115,9 @@ document.addEventListener("DOMContentLoaded", () => {
         gerenciamentoSistemasEl.classList.remove("d-none");
         dashboardContentEl.classList.remove("d-none");
         emptyStateEl.classList.add("d-none");
-
         popularSeletorDeSistemas();
-
         sistemaIdAtivo = listaDeSistemas[0].id;
         seletorSistemasEl.value = sistemaIdAtivo;
-
         carregarDashboardParaSistema(sistemaIdAtivo);
       } else {
         gerenciamentoSistemasEl.classList.add("d-none");
@@ -125,7 +146,7 @@ document.addEventListener("DOMContentLoaded", () => {
       nomeSistemaAtivoDisplayEl.textContent = `Exibindo dados para: ${sistemaAtivo.nome_sistema}`;
     }
     carregarDadosAtuais(sistemaId);
-    desenharGraficoHistorico(sistemaId); // <-- A chamada está aqui
+    desenharGraficoHistorico(sistemaId);
     carregarHistoricoEventos(sistemaId);
   }
 
@@ -167,7 +188,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // A DEFINIÇÃO DA FUNÇÃO ESTÁ AQUI
   async function desenharGraficoHistorico(sistemaId) {
     try {
       const dados = await fetchData(
@@ -182,9 +202,7 @@ document.addEventListener("DOMContentLoaded", () => {
       );
       const umidadeData = dados.map((d) => d.umidadeDoSolo);
       const temperaturaData = dados.map((d) => d.temperaturaDoAr);
-
       if (graficoHistorico) graficoHistorico.destroy();
-
       graficoHistorico = new Chart(ctx, {
         type: "line",
         data: {
@@ -243,20 +261,93 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  async function carregarCulturasNoModal() {
-    /* ...código da função... */
+  async function carregarCulturas(selectElement) {
+    try {
+      const culturas = await fetchData("/api/culturas");
+      if (!culturas) return;
+      selectElement.innerHTML = `<option value="">Selecione uma cultura (opcional)</option>`;
+      culturas.forEach((cultura) => {
+        const option = document.createElement("option");
+        option.value = cultura.id;
+        option.textContent = cultura.nome;
+        selectElement.appendChild(option);
+      });
+    } catch (error) {
+      console.error("Erro ao carregar culturas:", error);
+    }
   }
 
-  // --- 6. FUNÇÕES DE AÇÃO E CONTROLE ---
   function logout() {
     localStorage.removeItem("authToken");
     window.location.href = "login.html";
   }
 
-  // --- 7. EVENT LISTENERS ---
+  // --- 6. EVENT LISTENERS ---
   logoutButton.addEventListener("click", logout);
-  // ... (todos os outros event listeners)
+  seletorSistemasEl.addEventListener("change", () => {
+    sistemaIdAtivo = seletorSistemasEl.value;
+    carregarDashboardParaSistema(sistemaIdAtivo);
+  });
+  btnAdicionarPrimeiroSistema.addEventListener("click", () => {
+    carregarCulturas(selectCulturaNoModal);
+    modalSistema.show();
+  });
+  btnAbrirModalSistema.addEventListener("click", () => {
+    carregarCulturas(selectCulturaNoModal);
+    modalSistema.show();
+  });
+  document.getElementById("ligarBombaBtn").addEventListener("click", () => {
+    if (sistemaIdAtivo)
+      postData(`/api/sistemas/${sistemaIdAtivo}/comando`, { comando: "LIGAR" });
+  });
+  document.getElementById("desligarBombaBtn").addEventListener("click", () => {
+    if (sistemaIdAtivo)
+      postData(`/api/sistemas/${sistemaIdAtivo}/comando`, {
+        comando: "DESLIGAR",
+      });
+  });
+  btnExcluirSistema.addEventListener("click", async () => {
+    if (!sistemaIdAtivo) return;
+    const sistemaAtual = listaDeSistemas.find((s) => s.id == sistemaIdAtivo);
+    if (
+      confirm(
+        `Tem certeza que deseja excluir o sistema "${sistemaAtual.nome_sistema}"?`
+      )
+    ) {
+      try {
+        await deleteData(`/api/sistemas/${sistemaIdAtivo}`);
+        alert("Sistema excluído com sucesso!");
+        inicializarDashboard();
+      } catch (error) {
+        alert("Erro ao excluir o sistema.");
+      }
+    }
+  });
+  btnEditarSistema.addEventListener("click", () =>
+    alert("Funcionalidade de edição a ser implementada.")
+  );
+  formAdicionarSistema.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const body = {
+      nome_sistema: document.getElementById("nome_sistema").value,
+      thingspeak_channel_id: document.getElementById("channel_id").value,
+      thingspeak_read_apikey: document.getElementById("read_api_key").value,
+      cultura_id_atual: document.getElementById("cultura_sistema").value,
+    };
+    try {
+      await postData("/api/sistemas", body);
+      alert("Sistema cadastrado com sucesso!");
+      formAdicionarSistema.reset();
+      modalSistema.hide();
+      inicializarDashboard();
+    } catch (error) {
+      alert("Não foi possível cadastrar o sistema.");
+    }
+  });
 
-  // --- 8. INICIALIZAÇÃO ---
+  // --- 7. INICIALIZAÇÃO ---
   inicializarDashboard();
+  setInterval(() => {
+    if (sistemaIdAtivo) carregarDadosAtuais(sistemaIdAtivo);
+  }, 15000);
 });
