@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const API_URL = "http://localhost:3000"; // URL base da sua API
-  const sistemaIdAtual = 1; // Simplificação para o TCC, representando o sistema em uso
+  const sistemaIdAtual = 2; // Simplificação para o TCC, representando o sistema em uso
 
   // --- 2. SELETORES DE ELEMENTOS DO DOM ---
   // Mapeia os elementos do HTML para variáveis JavaScript para fácil acesso

@@ -1,14 +1,11 @@
-/* --- Importar Fonte do Google Fonts --- */
 @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap");
 
-/* --- Variáveis de Cores (as mesmas do dashboard) --- */
 :root {
-  --cor-primaria: #2e7d32; /* Verde Escuro */
-  --cor-fundo: #f4f7f6; /* Cinza bem claro */
+  --cor-primaria: #2e7d32;
+  --cor-fundo: #f4f7f6;
   --sombra-card: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-/* --- Estilos Gerais da Página --- */
 body {
   font-family: "Poppins", sans-serif;
   background-color: var(--cor-fundo);
@@ -19,7 +16,6 @@ body {
   padding: 2rem 0;
 }
 
-/* --- Container do Formulário --- */
 .auth-container {
   width: 100%;
   max-width: 450px;
@@ -29,7 +25,6 @@ body {
   box-shadow: var(--sombra-card);
 }
 
-/* --- Título --- */
 .auth-title {
   color: var(--cor-primaria);
   font-weight: 700;
@@ -39,8 +34,6 @@ body {
 .auth-title i {
   margin-right: 8px;
 }
-
-/* --- Botão Principal --- */
 .btn-primary {
   background-color: var(--cor-primaria);
   border-color: var(--cor-primaria);
@@ -52,17 +45,15 @@ body {
 
 .btn-primary:hover {
   transform: scale(1.03);
-  background-color: #276a2a; /* Um tom de verde um pouco mais escuro */
+  background-color: #276a2a;
   border-color: #276a2a;
 }
 
-/* --- Campos de Formulário (Inputs) --- */
 .form-control:focus {
-  border-color: #66bb6a; /* Verde claro no foco */
+  border-color: #66bb6a;
   box-shadow: 0 0 0 0.25rem rgba(46, 125, 50, 0.25);
 }
 
-/* --- Links --- */
 a {
   color: var(--cor-primaria);
   text-decoration: none;
