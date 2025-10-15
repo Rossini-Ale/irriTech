@@ -5,7 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
     window.location.href = "login.html";
     return;
   }
-  const API_URL = "http://localhost:3000";
+  const API_URL = ""; // ALTERAÇÃO APLICADA AQUI
   let sistemaIdAtivo = null;
   let listaDeSistemas = [];
 
