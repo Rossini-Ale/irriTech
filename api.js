@@ -3,9 +3,8 @@ const router = express.Router();
 const pool = require("../config/db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const { syncAndAutomate } = require("../services/syncService");
 
-// --- FUNÇÃO AUXILIAR ---
-// Converte strings como "Temperatura do Ar" para "temperaturaDoAr"
 function toCamelCase(str) {
   if (!str) return "";
   return str
@@ -15,9 +14,18 @@ function toCamelCase(str) {
     .replace(/\s+/g, "");
 }
 
-// --- ROTAS PÚBLICAS (NÃO PRECISAM DE AUTENTICAÇÃO) ---
+// ROTA PARA O CRON JOB DA VERCEL
+router.get("/cron", async (req, res) => {
+  try {
+    await syncAndAutomate();
+    res.status(200).send("Cron job executado.");
+  } catch (error) {
+    console.error("Erro no Cron Job:", error);
+    res.status(500).send("Erro ao executar o Cron Job.");
+  }
+});
 
-// Rota para CADASTRAR um novo usuário
+// ROTAS PÚBLICAS
 router.post("/cadastro", async (req, res) => {
   try {
     const { nome, email, senha } = req.body;
@@ -25,23 +33,23 @@ router.post("/cadastro", async (req, res) => {
       return res
         .status(400)
         .json({ message: "Todos os campos são obrigatórios." });
-    const [usuariosExistentes] = await pool.query(
-      "SELECT id FROM Usuarios WHERE email = ?",
+    const { rows: usuariosExistentes } = await pool.query(
+      "SELECT id FROM Usuarios WHERE email = $1",
       [email]
     );
     if (usuariosExistentes.length > 0)
       return res.status(409).json({ message: "Este e-mail já está em uso." });
     const salt = await bcrypt.genSalt(10);
     const senha_hash = await bcrypt.hash(senha, salt);
-    const [result] = await pool.query(
-      "INSERT INTO Usuarios (nome, email, senha_hash) VALUES (?, ?, ?)",
+    const { rows } = await pool.query(
+      "INSERT INTO Usuarios (nome, email, senha_hash) VALUES ($1, $2, $3) RETURNING id",
       [nome, email, senha_hash]
     );
     res
-      .status(21)
+      .status(201)
       .json({
         message: "Usuário cadastrado com sucesso!",
-        usuarioId: result.insertId,
+        usuarioId: rows[0].id,
       });
   } catch (error) {
     console.error("Erro na rota /cadastro:", error);
@@ -49,7 +57,6 @@ router.post("/cadastro", async (req, res) => {
   }
 });
 
-// Rota para AUTENTICAR um usuário (Login)
 router.post("/login", async (req, res) => {
   try {
     const { email, senha } = req.body;
@@ -57,8 +64,8 @@ router.post("/login", async (req, res) => {
       return res
         .status(400)
         .json({ message: "E-mail e senha são obrigatórios." });
-    const [usuarios] = await pool.query(
-      "SELECT * FROM Usuarios WHERE email = ?",
+    const { rows: usuarios } = await pool.query(
+      "SELECT * FROM Usuarios WHERE email = $1",
       [email]
     );
     if (usuarios.length === 0)
@@ -79,8 +86,7 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// --- MIDDLEWARE DE AUTENTICAÇÃO ---
-// Todas as rotas abaixo desta linha serão protegidas
+// MIDDLEWARE DE AUTENTICAÇÃO
 const verificarToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
@@ -93,23 +99,21 @@ const verificarToken = (req, res, next) => {
 };
 router.use(verificarToken);
 
-// --- ROTAS PROTEGIDAS ---
-
-// ROTA PARA LISTAR todos os sistemas do usuário logado
+// ROTAS PROTEGIDAS
 router.get("/sistemas", async (req, res) => {
   try {
     const usuario_id = req.usuario.id;
-    const [sistemas] = await pool.query(
-      "SELECT id, nome_sistema FROM Sistemas_Irrigacao WHERE usuario_id = ?",
+    const { rows: sistemas } = await pool.query(
+      "SELECT id, nome_sistema, cultura_id_atual FROM Sistemas_Irrigacao WHERE usuario_id = $1",
       [usuario_id]
     );
     res.json(sistemas);
   } catch (error) {
+    console.error("Erro na rota GET /sistemas:", error);
     res.status(500).json({ message: "Erro interno no servidor." });
   }
 });
 
-// Rota para CADASTRAR um novo Sistema de Irrigação
 router.post("/sistemas", async (req, res) => {
   try {
     const {
@@ -123,8 +127,8 @@ router.post("/sistemas", async (req, res) => {
       return res
         .status(400)
         .json({ message: "Todos os campos são obrigatórios." });
-    const [result] = await pool.query(
-      "INSERT INTO Sistemas_Irrigacao (usuario_id, nome_sistema, thingspeak_channel_id, thingspeak_read_apikey, cultura_id_atual) VALUES (?, ?, ?, ?, ?)",
+    const { rows } = await pool.query(
+      "INSERT INTO Sistemas_Irrigacao (usuario_id, nome_sistema, thingspeak_channel_id, thingspeak_read_apikey, cultura_id_atual) VALUES ($1, $2, $3, $4, $5) RETURNING id",
       [
         usuario_id,
         nome_sistema,
@@ -137,7 +141,7 @@ router.post("/sistemas", async (req, res) => {
       .status(201)
       .json({
         message: "Sistema de irrigação cadastrado com sucesso!",
-        sistemaId: result.insertId,
+        sistemaId: rows[0].id,
       });
   } catch (error) {
     console.error("Erro na rota POST /sistemas:", error);
@@ -145,10 +149,82 @@ router.post("/sistemas", async (req, res) => {
   }
 });
 
-// Rota para LISTAR todas as culturas
+router.get("/sistemas/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const usuario_id = req.usuario.id;
+    const {
+      rows: [sistema],
+    } = await pool.query(
+      "SELECT id, nome_sistema, thingspeak_channel_id, thingspeak_read_apikey FROM Sistemas_Irrigacao WHERE id = $1 AND usuario_id = $2",
+      [id, usuario_id]
+    );
+    if (!sistema)
+      return res
+        .status(404)
+        .json({
+          message: "Sistema não encontrado ou não pertence a este usuário.",
+        });
+    res.json(sistema);
+  } catch (error) {
+    console.error("Erro na rota GET /sistemas/:id:", error);
+    res.status(500).json({ message: "Erro ao buscar detalhes do sistema." });
+  }
+});
+
+router.put("/sistemas/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nome_sistema, thingspeak_channel_id, thingspeak_read_apikey } =
+      req.body;
+    const usuario_id = req.usuario.id;
+    const { rowCount } = await pool.query(
+      "UPDATE Sistemas_Irrigacao SET nome_sistema = $1, thingspeak_channel_id = $2, thingspeak_read_apikey = $3 WHERE id = $4 AND usuario_id = $5",
+      [
+        nome_sistema,
+        thingspeak_channel_id,
+        thingspeak_read_apikey,
+        id,
+        usuario_id,
+      ]
+    );
+    if (rowCount === 0)
+      return res
+        .status(404)
+        .json({
+          message: "Sistema não encontrado ou não pertence a este usuário.",
+        });
+    res.status(200).json({ message: "Sistema atualizado com sucesso!" });
+  } catch (error) {
+    console.error("Erro ao atualizar sistema:", error);
+    res.status(500).json({ message: "Erro interno no servidor." });
+  }
+});
+
+router.delete("/sistemas/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const usuario_id = req.usuario.id;
+    const { rowCount } = await pool.query(
+      "DELETE FROM Sistemas_Irrigacao WHERE id = $1 AND usuario_id = $2",
+      [id, usuario_id]
+    );
+    if (rowCount === 0)
+      return res
+        .status(404)
+        .json({
+          message: "Sistema não encontrado ou não pertence a este usuário.",
+        });
+    res.status(200).json({ message: "Sistema excluído com sucesso!" });
+  } catch (error) {
+    console.error("Erro ao excluir sistema:", error);
+    res.status(500).json({ message: "Erro interno no servidor." });
+  }
+});
+
 router.get("/culturas", async (req, res) => {
   try {
-    const [culturas] = await pool.query(
+    const { rows: culturas } = await pool.query(
       "SELECT id, nome FROM Culturas ORDER BY nome ASC"
     );
     res.json(culturas);
@@ -158,26 +234,21 @@ router.get("/culturas", async (req, res) => {
   }
 });
 
-// Rota para ATUALIZAR a cultura de um sistema
 router.put("/sistemas/:sistemaId/cultura", async (req, res) => {
   try {
     const { sistemaId } = req.params;
     const { cultura_id } = req.body;
     const usuario_id = req.usuario.id;
-    const [[sistema]] = await pool.query(
-      "SELECT id FROM Sistemas_Irrigacao WHERE id = ? AND usuario_id = ?",
-      [sistemaId, usuario_id]
+    const { rowCount } = await pool.query(
+      "UPDATE Sistemas_Irrigacao SET cultura_id_atual = $1 WHERE id = $2 AND usuario_id = $3",
+      [cultura_id, sistemaId, usuario_id]
     );
-    if (!sistema)
+    if (rowCount === 0)
       return res
         .status(404)
         .json({
           message: "Sistema não encontrado ou não pertence a este usuário.",
         });
-    await pool.query(
-      "UPDATE Sistemas_Irrigacao SET cultura_id_atual = ? WHERE id = ?",
-      [cultura_id, sistemaId]
-    );
     res
       .status(200)
       .json({ message: "Cultura do sistema atualizada com sucesso!" });
@@ -187,19 +258,20 @@ router.put("/sistemas/:sistemaId/cultura", async (req, res) => {
   }
 });
 
-// Rota para o HARDWARE buscar comandos
 router.get("/comando/:sistemaId", async (req, res) => {
   try {
     const { sistemaId } = req.params;
-    const [[sistema]] = await pool.query(
-      "SELECT comando_irrigacao FROM Sistemas_Irrigacao WHERE id = ?",
+    const {
+      rows: [sistema],
+    } = await pool.query(
+      "SELECT comando_irrigacao FROM Sistemas_Irrigacao WHERE id = $1",
       [sistemaId]
     );
     if (sistema) {
       res.json({ comando: sistema.comando_irrigacao });
       if (sistema.comando_irrigacao === "LIGAR") {
         await pool.query(
-          "UPDATE Sistemas_Irrigacao SET comando_irrigacao = 'DESLIGAR' WHERE id = ?",
+          "UPDATE Sistemas_Irrigacao SET comando_irrigacao = 'DESLIGAR' WHERE id = $1",
           [sistemaId]
         );
       }
@@ -212,24 +284,19 @@ router.get("/comando/:sistemaId", async (req, res) => {
   }
 });
 
-// Rota para o FRONTEND enviar comandos manuais
 router.post("/sistemas/:sistemaId/comando", async (req, res) => {
   try {
     const { sistemaId } = req.params;
     const { comando } = req.body;
     const usuario_id = req.usuario.id;
-    const [[sistema]] = await pool.query(
-      "SELECT id FROM Sistemas_Irrigacao WHERE id = ? AND usuario_id = ?",
-      [sistemaId, usuario_id]
+    const { rowCount } = await pool.query(
+      "UPDATE Sistemas_Irrigacao SET comando_irrigacao = $1 WHERE id = $2 AND usuario_id = $3",
+      [comando, sistemaId, usuario_id]
     );
-    if (!sistema)
+    if (rowCount === 0)
       return res.status(404).json({ message: "Sistema não encontrado." });
     await pool.query(
-      "UPDATE Sistemas_Irrigacao SET comando_irrigacao = ? WHERE id = ?",
-      [comando, sistemaId]
-    );
-    await pool.query(
-      "INSERT INTO Eventos_Irrigacao (sistema_id, acao, motivo) VALUES (?, ?, ?)",
+      "INSERT INTO Eventos_Irrigacao (sistema_id, acao, motivo) VALUES ($1, $2, $3)",
       [sistemaId, `${comando}_MANUAL`, "Acionamento via dashboard"]
     );
     res
@@ -241,20 +308,21 @@ router.post("/sistemas/:sistemaId/comando", async (req, res) => {
   }
 });
 
-// Rota para buscar os DADOS ATUAIS
 router.get("/sistemas/:sistemaId/dados-atuais", async (req, res) => {
   try {
     const { sistemaId } = req.params;
     const usuario_id = req.usuario.id;
-    const [[sistema]] = await pool.query(
-      "SELECT id, comando_irrigacao FROM Sistemas_Irrigacao WHERE id = ? AND usuario_id = ?",
+    const {
+      rows: [sistema],
+    } = await pool.query(
+      "SELECT id, comando_irrigacao FROM Sistemas_Irrigacao WHERE id = $1 AND usuario_id = $2",
       [sistemaId, usuario_id]
     );
     if (!sistema)
       return res.status(404).json({ message: "Sistema não encontrado." });
 
-    const sql = `SELECT mt.tipo_leitura, l.valor FROM Leituras l JOIN Mapeamento_ThingSpeak mt ON l.mapeamento_id = mt.id WHERE (l.mapeamento_id, l.timestamp) IN (SELECT mapeamento_id, MAX(timestamp) FROM Leituras GROUP BY mapeamento_id) AND mt.sistema_id = ?;`;
-    const [rows] = await pool.query(sql, [sistemaId]);
+    const sql = `SELECT mt.tipo_leitura, l.valor FROM Leituras l JOIN Mapeamento_ThingSpeak mt ON l.mapeamento_id = mt.id WHERE (l.mapeamento_id, l."timestamp") IN (SELECT mapeamento_id, MAX("timestamp") FROM Leituras GROUP BY mapeamento_id) AND mt.sistema_id = $1;`;
+    const { rows } = await pool.query(sql, [sistemaId]);
     const dadosFormatados = rows.reduce((acc, { tipo_leitura, valor }) => {
       const key = toCamelCase(tipo_leitura);
       acc[key] = { valor };
@@ -262,8 +330,10 @@ router.get("/sistemas/:sistemaId/dados-atuais", async (req, res) => {
     }, {});
     dadosFormatados.statusBomba = sistema.comando_irrigacao;
 
-    const [[ultimoET]] = await pool.query(
-      "SELECT valor_et_calculado FROM Calculos_ET WHERE sistema_id = ? ORDER BY timestamp_calculo DESC LIMIT 1",
+    const {
+      rows: [ultimoET],
+    } = await pool.query(
+      "SELECT valor_et_calculado FROM Calculos_ET WHERE sistema_id = $1 ORDER BY timestamp_calculo DESC LIMIT 1",
       [sistemaId]
     );
     if (ultimoET) {
@@ -273,44 +343,45 @@ router.get("/sistemas/:sistemaId/dados-atuais", async (req, res) => {
     }
     res.json(dadosFormatados);
   } catch (error) {
+    console.error("Erro na rota /dados-atuais:", error);
     res.status(500).json({ message: "Erro ao buscar dados atuais." });
   }
 });
 
-// Rota para buscar EVENTOS
 router.get("/sistemas/:sistemaId/eventos", async (req, res) => {
   try {
     const { sistemaId } = req.params;
     const usuario_id = req.usuario.id;
-    const [[sistema]] = await pool.query(
-      "SELECT id FROM Sistemas_Irrigacao WHERE id = ? AND usuario_id = ?",
+    const { rowCount } = await pool.query(
+      "SELECT id FROM Sistemas_Irrigacao WHERE id = $1 AND usuario_id = $2",
       [sistemaId, usuario_id]
     );
-    if (!sistema)
+    if (rowCount === 0)
       return res.status(404).json({ message: "Sistema não encontrado." });
-    const [eventos] = await pool.query(
-      "SELECT * FROM Eventos_Irrigacao WHERE sistema_id = ? ORDER BY timestamp DESC LIMIT 10",
+    const { rows: eventos } = await pool.query(
+      'SELECT * FROM Eventos_Irrigacao WHERE sistema_id = $1 ORDER BY "timestamp" DESC LIMIT 10',
       [sistemaId]
     );
     res.json(eventos);
   } catch (error) {
+    console.error("Erro na rota /eventos:", error);
     res.status(500).json({ message: "Erro ao buscar eventos." });
   }
 });
 
-// Rota para buscar DADOS HISTÓRICOS
 router.get("/sistemas/:sistemaId/dados-historicos", async (req, res) => {
   try {
     const { sistemaId } = req.params;
     const usuario_id = req.usuario.id;
-    const [[sistema]] = await pool.query(
-      "SELECT id FROM Sistemas_Irrigacao WHERE id = ? AND usuario_id = ?",
+    const { rowCount } = await pool.query(
+      "SELECT id FROM Sistemas_Irrigacao WHERE id = $1 AND usuario_id = $2",
       [sistemaId, usuario_id]
     );
-    if (!sistema)
+    if (rowCount === 0)
       return res.status(404).json({ message: "Sistema não encontrado." });
-    const sql = `SELECT mt.tipo_leitura, l.valor, l.timestamp FROM Leituras l JOIN Mapeamento_ThingSpeak mt ON l.mapeamento_id = mt.id WHERE mt.sistema_id = ? AND l.timestamp >= NOW() - INTERVAL 1 DAY ORDER BY l.timestamp ASC;`;
-    const [leituras] = await pool.query(sql, [sistemaId]);
+
+    const sql = `SELECT mt.tipo_leitura, l.valor, l."timestamp" FROM Leituras l JOIN Mapeamento_ThingSpeak mt ON l.mapeamento_id = mt.id WHERE mt.sistema_id = $1 AND l."timestamp" >= NOW() - INTERVAL '1 DAY' ORDER BY l."timestamp" ASC;`;
+    const { rows: leituras } = await pool.query(sql, [sistemaId]);
     const dadosFormatados = [];
     const timestamps = [
       ...new Set(leituras.map((l) => l.timestamp.toISOString())),
@@ -328,6 +399,7 @@ router.get("/sistemas/:sistemaId/dados-historicos", async (req, res) => {
     });
     res.json(dadosFormatados);
   } catch (error) {
+    console.error("Erro na rota /dados-historicos:", error);
     res.status(500).json({ message: "Erro ao buscar dados históricos." });
   }
 });

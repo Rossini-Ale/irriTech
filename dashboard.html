@@ -156,6 +156,37 @@
           </div>
         </div>
       </div>
+      <div class="modal fade" id="modalEditarSistema" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Sistema</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEditarSistema">
+                    <input type="hidden" id="edit_sistema_id">
+                    <div class="mb-3">
+                        <label for="edit_nome_sistema" class="form-label">Nome do Sistema</label>
+                        <input type="text" class="form-control" id="edit_nome_sistema" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_channel_id" class="form-label">ID do Canal do ThingSpeak</label>
+                        <input type="text" class="form-control" id="edit_channel_id" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_read_api_key" class="form-label">Chave de API de Leitura</label>
+                        <input type="text" class="form-control" id="edit_read_api_key" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary" form="formEditarSistema">Salvar Alterações</button>
+            </div>
+        </div>
+    </div>
+</div>
     </main>
 
     <div

@@ -41,6 +41,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const formAdicionarSistema = document.getElementById("formAdicionarSistema");
   const modalSistema = new bootstrap.Modal(modalAdicionarSistemaEl);
   const selectCulturaNoModal = document.getElementById("cultura_sistema");
+  const modalEditarSistemaEl = document.getElementById("modalEditarSistema");
+  const formEditarSistema = document.getElementById("formEditarSistema");
+  const modalEditar = new bootstrap.Modal(modalEditarSistemaEl);
+
+  const selectCultura = document.getElementById("select_cultura");
 
   // --- 3. FUNÇÕES AUXILIARES DE API ---
   async function fetchData(endpoint) {
@@ -58,7 +63,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return null;
     }
   }
-
   async function postData(endpoint, body, method = "POST") {
     try {
       const response = await fetch(`${API_URL}${endpoint}`, {
@@ -82,11 +86,9 @@ document.addEventListener("DOMContentLoaded", () => {
       throw error;
     }
   }
-
   async function putData(endpoint, body) {
     return postData(endpoint, body, "PUT");
   }
-
   async function deleteData(endpoint) {
     try {
       const response = await fetch(`${API_URL}${endpoint}`, {
@@ -148,6 +150,7 @@ document.addEventListener("DOMContentLoaded", () => {
     carregarDadosAtuais(sistemaId);
     desenharGraficoHistorico(sistemaId);
     carregarHistoricoEventos(sistemaId);
+    carregarCulturas(selectCultura, sistemaId);
   }
 
   // --- 5. FUNÇÕES DE CARREGAMENTO DE DADOS ---
@@ -261,17 +264,23 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  async function carregarCulturas(selectElement) {
+  async function carregarCulturas(selectElement, sistemaId) {
     try {
       const culturas = await fetchData("/api/culturas");
       if (!culturas) return;
-      selectElement.innerHTML = `<option value="">Selecione uma cultura (opcional)</option>`;
+      selectElement.innerHTML = `<option value="">Selecione...</option>`;
       culturas.forEach((cultura) => {
         const option = document.createElement("option");
         option.value = cultura.id;
         option.textContent = cultura.nome;
         selectElement.appendChild(option);
       });
+      if (sistemaId) {
+        const sistemaAtual = listaDeSistemas.find((s) => s.id == sistemaId);
+        if (sistemaAtual && sistemaAtual.cultura_id_atual) {
+          selectElement.value = sistemaAtual.cultura_id_atual;
+        }
+      }
     } catch (error) {
       console.error("Erro ao carregar culturas:", error);
     }
@@ -323,9 +332,23 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
   });
-  btnEditarSistema.addEventListener("click", () =>
-    alert("Funcionalidade de edição a ser implementada.")
-  );
+  btnEditarSistema.addEventListener("click", async () => {
+    if (!sistemaIdAtivo) return;
+    try {
+      const sistema = await fetchData(`/api/sistemas/${sistemaIdAtivo}`);
+      if (!sistema)
+        return alert("Não foi possível carregar os dados do sistema.");
+      document.getElementById("edit_sistema_id").value = sistema.id;
+      document.getElementById("edit_nome_sistema").value = sistema.nome_sistema;
+      document.getElementById("edit_channel_id").value =
+        sistema.thingspeak_channel_id;
+      document.getElementById("edit_read_api_key").value =
+        sistema.thingspeak_read_apikey;
+      modalEditar.show();
+    } catch (error) {
+      alert("Erro ao carregar dados para edição.");
+    }
+  });
   formAdicionarSistema.addEventListener("submit", async (event) => {
     event.preventDefault();
     const body = {
@@ -342,6 +365,24 @@ document.addEventListener("DOMContentLoaded", () => {
       inicializarDashboard();
     } catch (error) {
       alert("Não foi possível cadastrar o sistema.");
+    }
+  });
+  formEditarSistema.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const id = document.getElementById("edit_sistema_id").value;
+    const body = {
+      nome_sistema: document.getElementById("edit_nome_sistema").value,
+      thingspeak_channel_id: document.getElementById("edit_channel_id").value,
+      thingspeak_read_apikey:
+        document.getElementById("edit_read_api_key").value,
+    };
+    try {
+      await putData(`/api/sistemas/${id}`, body);
+      alert("Sistema atualizado com sucesso!");
+      modalEditar.hide();
+      inicializarDashboard();
+    } catch (error) {
+      alert("Não foi possível atualizar o sistema.");
     }
   });
 
