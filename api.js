@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
-const pool = require("../config/db");
+const pool = require("./db");
+const { syncAndAutomate } = require("./syncService");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { syncAndAutomate } = require("../services/syncService");
 
 function toCamelCase(str) {
   if (!str) return "";
@@ -45,12 +45,10 @@ router.post("/cadastro", async (req, res) => {
       "INSERT INTO Usuarios (nome, email, senha_hash) VALUES ($1, $2, $3) RETURNING id",
       [nome, email, senha_hash]
     );
-    res
-      .status(201)
-      .json({
-        message: "Usuário cadastrado com sucesso!",
-        usuarioId: rows[0].id,
-      });
+    res.status(201).json({
+      message: "Usuário cadastrado com sucesso!",
+      usuarioId: rows[0].id,
+    });
   } catch (error) {
     console.error("Erro na rota /cadastro:", error);
     res.status(500).json({ message: "Erro interno no servidor." });
@@ -137,12 +135,10 @@ router.post("/sistemas", async (req, res) => {
         cultura_id_atual || null,
       ]
     );
-    res
-      .status(201)
-      .json({
-        message: "Sistema de irrigação cadastrado com sucesso!",
-        sistemaId: rows[0].id,
-      });
+    res.status(201).json({
+      message: "Sistema de irrigação cadastrado com sucesso!",
+      sistemaId: rows[0].id,
+    });
   } catch (error) {
     console.error("Erro na rota POST /sistemas:", error);
     res.status(500).json({ message: "Erro interno no servidor." });
@@ -160,11 +156,9 @@ router.get("/sistemas/:id", async (req, res) => {
       [id, usuario_id]
     );
     if (!sistema)
-      return res
-        .status(404)
-        .json({
-          message: "Sistema não encontrado ou não pertence a este usuário.",
-        });
+      return res.status(404).json({
+        message: "Sistema não encontrado ou não pertence a este usuário.",
+      });
     res.json(sistema);
   } catch (error) {
     console.error("Erro na rota GET /sistemas/:id:", error);
@@ -189,11 +183,9 @@ router.put("/sistemas/:id", async (req, res) => {
       ]
     );
     if (rowCount === 0)
-      return res
-        .status(404)
-        .json({
-          message: "Sistema não encontrado ou não pertence a este usuário.",
-        });
+      return res.status(404).json({
+        message: "Sistema não encontrado ou não pertence a este usuário.",
+      });
     res.status(200).json({ message: "Sistema atualizado com sucesso!" });
   } catch (error) {
     console.error("Erro ao atualizar sistema:", error);
@@ -210,11 +202,9 @@ router.delete("/sistemas/:id", async (req, res) => {
       [id, usuario_id]
     );
     if (rowCount === 0)
-      return res
-        .status(404)
-        .json({
-          message: "Sistema não encontrado ou não pertence a este usuário.",
-        });
+      return res.status(404).json({
+        message: "Sistema não encontrado ou não pertence a este usuário.",
+      });
     res.status(200).json({ message: "Sistema excluído com sucesso!" });
   } catch (error) {
     console.error("Erro ao excluir sistema:", error);
@@ -244,11 +234,9 @@ router.put("/sistemas/:sistemaId/cultura", async (req, res) => {
       [cultura_id, sistemaId, usuario_id]
     );
     if (rowCount === 0)
-      return res
-        .status(404)
-        .json({
-          message: "Sistema não encontrado ou não pertence a este usuário.",
-        });
+      return res.status(404).json({
+        message: "Sistema não encontrado ou não pertence a este usuário.",
+      });
     res
       .status(200)
       .json({ message: "Cultura do sistema atualizada com sucesso!" });

@@ -1,6 +1,5 @@
 const axios = require("axios");
-const pool = require("../config/db");
-
+const pool = require("./db");
 async function calcularET_Camargo(sistema_id, connection) {
   try {
     const radiacaoSolarMensal = [
